@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Alerta;
 use App\Models\Anuncio;
+use App\Models\Mensagem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -103,6 +104,32 @@ class FavoritosMensagensApiTest extends TestCase
         $this->getJson('/api/v1/mensagens')
             ->assertOk()
             ->assertJsonPath('data.0.id', $id);
+    }
+
+    public function test_dono_pode_escrever_no_proprio_anuncio_e_a_conversa_desaparece_ao_apagar(): void
+    {
+        $dono = User::factory()->create();
+        $anuncio = Anuncio::factory()->create([
+            'user_id' => $dono->id,
+            'status' => 'aprovado',
+        ]);
+        Sanctum::actingAs($dono);
+
+        $id = $this->postJson('/api/v1/anuncios/'.$anuncio->id.'/mensagens', [
+            'mensagem' => 'Nota para mim.',
+        ])->assertCreated()->json('data.id');
+
+        $this->assertDatabaseHas('mensagens', [
+            'id' => $id,
+            'remetente_id' => $dono->id,
+            'destinatario_id' => $dono->id,
+        ]);
+
+        $this->deleteJson('/api/v1/mensagens/'.$id)->assertOk();
+
+        $this->getJson('/api/v1/mensagens')->assertOk()->assertJsonCount(0, 'data');
+        $this->assertNotNull(Mensagem::find($id)->remetente_deleted_at);
+        $this->assertNotNull(Mensagem::find($id)->destinatario_deleted_at);
     }
 
     public function test_avaliacoes_e_alertas(): void
