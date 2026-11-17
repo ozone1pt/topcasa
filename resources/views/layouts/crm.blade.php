@@ -33,8 +33,8 @@
                             ['route' => 'crm.dashboard', 'icon' => 'fa-gauge', 'label' => 'Dashboard'],
                             ['route' => 'crm.users.index', 'icon' => 'fa-users', 'label' => 'Clientes'],
                             ['route' => 'crm.anuncios.index', 'icon' => 'fa-rectangle-ad', 'label' => 'Anúncios'],
-                            ['route' => 'crm.orcamentos.index', 'icon' => 'fa-file-invoice-dollar', 'label' => 'Orçamentos'],
-                            ['route' => 'crm.recrutamentos.index', 'icon' => 'fa-briefcase', 'label' => 'Recrutamento'],
+                            ['route' => 'crm.orcamentos.index', 'icon' => 'fa-file-invoice-dollar', 'label' => 'Orçamentos', 'pendentes' => \App\Models\PedidoOrcamento::where('status', 'pendente')->count()],
+                            ['route' => 'crm.recrutamentos.index', 'icon' => 'fa-briefcase', 'label' => 'Recrutamento', 'pendentes' => \App\Models\PedidoRecrutamento::where('status', 'pendente')->count()],
                             ['route' => 'crm.contactos.index', 'icon' => 'fa-chart-line', 'label' => 'Contactos'],
                         ];
                         $maisLinks = [
@@ -59,6 +59,9 @@
                             ])
                         >
                             <i class="fa-solid {{ $link['icon'] }} w-4 text-center"></i> {{ $link['label'] }}
+                            @if (! empty($link['pendentes']))
+                                <span title="Pendentes de aprovação" class="rounded-full bg-amber-100 text-amber-800 text-xs font-semibold" style="margin-left:auto;padding:0 .45rem">{{ $link['pendentes'] }}</span>
+                            @endif
                         </a>
                     @endforeach
 

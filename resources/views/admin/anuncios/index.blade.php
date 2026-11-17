@@ -56,8 +56,9 @@
                                 @csrf
                                 <button type="submit" class="btn btn-primary btn-sm">Aprovar</button>
                             </form>
-                            <form method="POST" action="{{ route('crm.anuncios.rejeitar', $anuncio) }}">
+                            <form method="POST" action="{{ route('crm.anuncios.rejeitar', $anuncio) }}" class="flex items-center gap-1">
                                 @csrf
+                                <input type="text" name="motivo_rejeicao" maxlength="500" placeholder="Motivo (opcional)" class="rounded-md border-slate-300 text-sm" style="width:11rem;padding:.25rem .5rem" />
                                 <button type="submit" class="btn btn-danger btn-sm">Rejeitar</button>
                             </form>
                         @else

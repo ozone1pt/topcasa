@@ -22,6 +22,8 @@ class DashboardController extends Controller
                 'anuncios_aprovados' => Anuncio::where('status', 'aprovado')->count(),
                 'avaliacoes_pendentes' => Review::where('status', 'pendente')->count(),
                 'orcamentos_total' => PedidoOrcamento::count(),
+                'orcamentos_pendentes' => PedidoOrcamento::where('status', 'pendente')->count(),
+                'recrutamentos_pendentes' => PedidoRecrutamento::where('status', 'pendente')->count(),
                 'recrutamentos_ativos' => PedidoRecrutamento::where('status', 'ativo')->count(),
                 'utilizadores_total' => User::count(),
                 'anuncios_total' => Anuncio::count(),

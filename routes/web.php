@@ -148,10 +148,14 @@ Route::middleware(['auth', 'can:admin'])->prefix('crm')->name('crm.')->group(fun
 
     Route::get('/orcamentos', [AdminOrcamentoController::class, 'index'])->name('orcamentos.index');
     Route::put('/orcamentos/{pedido}', [AdminOrcamentoController::class, 'update'])->name('orcamentos.update');
+    Route::post('/orcamentos/{pedido}/aprovar', [AdminOrcamentoController::class, 'aprovar'])->name('orcamentos.aprovar');
+    Route::post('/orcamentos/{pedido}/rejeitar', [AdminOrcamentoController::class, 'rejeitar'])->name('orcamentos.rejeitar');
     Route::delete('/orcamentos/{pedido}', [AdminOrcamentoController::class, 'destroy'])->name('orcamentos.destroy');
 
     Route::get('/recrutamentos', [AdminRecrutamentoController::class, 'index'])->name('recrutamentos.index');
     Route::put('/recrutamentos/{pedido}', [AdminRecrutamentoController::class, 'update'])->name('recrutamentos.update');
+    Route::post('/recrutamentos/{pedido}/aprovar', [AdminRecrutamentoController::class, 'aprovar'])->name('recrutamentos.aprovar');
+    Route::post('/recrutamentos/{pedido}/rejeitar', [AdminRecrutamentoController::class, 'rejeitar'])->name('recrutamentos.rejeitar');
     Route::delete('/recrutamentos/{pedido}', [AdminRecrutamentoController::class, 'destroy'])->name('recrutamentos.destroy');
 
     Route::get('/newsletter', [AdminNewsletterController::class, 'index'])->name('newsletter.index');

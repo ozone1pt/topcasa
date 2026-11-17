@@ -29,6 +29,14 @@
                 <p class="text-xl font-bold text-amber-600">{{ $stats['anuncios_pendentes'] }}</p>
                 <p class="text-sm text-slate-500">Anúncios pendentes de aprovação</p>
             </a>
+            <a href="{{ route('crm.orcamentos.index', ['status' => 'pendente']) }}" class="card p-4 hover:shadow-md hover:border-amber-300 transition">
+                <p class="text-xl font-bold text-amber-600">{{ $stats['orcamentos_pendentes'] }}</p>
+                <p class="text-sm text-slate-500">Orçamentos pendentes de aprovação</p>
+            </a>
+            <a href="{{ route('crm.recrutamentos.index', ['status' => 'pendente']) }}" class="card p-4 hover:shadow-md hover:border-amber-300 transition">
+                <p class="text-xl font-bold text-amber-600">{{ $stats['recrutamentos_pendentes'] }}</p>
+                <p class="text-sm text-slate-500">Vagas pendentes de aprovação</p>
+            </a>
             <a href="{{ route('crm.recrutamentos.index') }}" class="card p-4 hover:shadow-md hover:border-green-300 transition">
                 <p class="text-xl font-bold text-green-600">{{ $stats['recrutamentos_ativos'] }}</p>
                 <p class="text-sm text-slate-500">Vagas de recrutamento ativas</p>

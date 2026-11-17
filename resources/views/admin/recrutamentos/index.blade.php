@@ -8,7 +8,7 @@
             <input type="text" name="busca" value="{{ request('busca') }}" placeholder="Pesquisar título ou empresa..." class="rounded-md border-slate-300" />
             <select name="status" class="rounded-md border-slate-300">
                 <option value="">Todos os estados</option>
-                @foreach (['ativo', 'pausado', 'cancelado'] as $status)
+                @foreach (['pendente', 'ativo', 'pausado', 'rejeitado', 'cancelado'] as $status)
                     <option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>
                 @endforeach
             </select>
@@ -18,19 +18,41 @@
         <div class="bg-white rounded-lg shadow divide-y">
             @forelse ($pedidos as $pedido)
                 <div class="p-4">
-                    <div class="flex items-center justify-between gap-4">
-                        <div>
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="min-w-0">
+                            @if ($pedido->foto)
+                                @include('admin.partials.pedido-foto', ['url' => $pedido->fotoUrl()])
+                            @endif
                             <p class="font-medium text-slate-900">{{ $pedido->titulo }}</p>
-                            <p class="text-xs text-slate-500">{{ $pedido->empresa_nome }} · {{ $pedido->distrito?->nome }} · publicado em {{ $pedido->created_at?->timezone('Europe/Lisbon')->format('d/m/Y H:i') }}</p>
+                            <p class="text-xs text-slate-500">{{ $pedido->empresa_nome }} · {{ $pedido->email }} · {{ $pedido->telefone }} · {{ $pedido->distrito?->nome }} · submetida em {{ $pedido->created_at?->timezone('Europe/Lisbon')->format('d/m/Y H:i') }}</p>
+                            <p class="text-sm text-slate-600 mt-1 whitespace-pre-line">{{ Str::limit($pedido->descricao, 400) }}</p>
                             <p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-phone"></i> {{ $pedido->phone_clicks }} clique(s) em contacto</p>
+                            @if ($pedido->status === 'rejeitado' && $pedido->motivo_rejeicao)
+                                <p class="text-xs text-red-600 mt-1">Motivo da rejeição: {{ $pedido->motivo_rejeicao }}</p>
+                            @endif
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div class="flex flex-wrap items-center gap-2 shrink-0">
                             <span @class([
                                 'text-xs font-semibold px-2 py-0.5 rounded-full',
                                 'bg-green-100 text-green-800' => $pedido->status === 'ativo',
-                                'bg-amber-100 text-amber-800' => $pedido->status === 'pausado',
-                                'bg-red-100 text-red-800' => $pedido->status === 'cancelado',
+                                'bg-amber-100 text-amber-800' => in_array($pedido->status, ['pendente', 'pausado'], true),
+                                'bg-red-100 text-red-800' => in_array($pedido->status, ['rejeitado', 'cancelado'], true),
                             ])>{{ ucfirst($pedido->status) }}</span>
+
+                            @if (in_array($pedido->status, ['pendente', 'rejeitado'], true))
+                                <form method="POST" action="{{ route('crm.recrutamentos.aprovar', $pedido) }}">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm">Aprovar</button>
+                                </form>
+                            @endif
+                            @if ($pedido->status === 'pendente')
+                                <form method="POST" action="{{ route('crm.recrutamentos.rejeitar', $pedido) }}" class="flex items-center gap-1">
+                                    @csrf
+                                    <input type="text" name="motivo_rejeicao" maxlength="500" placeholder="Motivo (opcional)" class="rounded-md border-slate-300 text-sm" style="width:11rem;padding:.25rem .5rem" />
+                                    <button type="submit" class="btn btn-danger btn-sm">Rejeitar</button>
+                                </form>
+                            @endif
+
                             <button type="button" class="btn btn-outline btn-sm" @click="open = open === {{ $pedido->id }} ? null : {{ $pedido->id }}">Gerir</button>
                             <form method="POST" action="{{ route('crm.recrutamentos.destroy', $pedido) }}" onsubmit="return confirm('Remover esta vaga?')">
                                 @csrf
@@ -49,14 +71,18 @@
                     >
                         @csrf
                         @method('PUT')
-                        <div>
-                            <x-input-label value="Estado" />
-                            <select name="status" class="mt-1 block w-full sm:w-56 border-slate-300 rounded-md">
-                                @foreach (['ativo', 'pausado', 'cancelado'] as $status)
-                                    <option value="{{ $status }}" @selected($pedido->status === $status)>{{ ucfirst($status) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        @if ($pedido->isAprovado())
+                            <div>
+                                <x-input-label value="Estado" />
+                                <select name="status" class="mt-1 block w-full sm:w-56 border-slate-300 rounded-md">
+                                    @foreach (['ativo', 'pausado', 'cancelado'] as $status)
+                                        <option value="{{ $status }}" @selected($pedido->status === $status)>{{ ucfirst($status) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            <p class="text-sm text-slate-500">Esta vaga ainda não está aprovada. Para a publicar usa "Aprovar" (os emails só são enviados nessa altura).</p>
+                        @endif
                         <div>
                             <x-input-label value="Notas internas" />
                             <textarea name="notas_admin" rows="2" class="mt-1 block w-full border-slate-300 rounded-md">{{ $pedido->notas_admin }}</textarea>
