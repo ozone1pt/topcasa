@@ -1,6 +1,6 @@
 # Deploy do TopCasa (Hostinger)
 
-Guia para colocar o site novo em produção na mesma conta Hostinger (`u855228810`)
+Guia para colocar o site novo em produção na mesma conta Hostinger (`u738589882`)
 que já aloja o site antigo. Segue esta ordem — a rotação de segredos é o passo
 mais importante e deve ser feita **antes** de o site novo ficar acessível
 publicamente.
@@ -24,7 +24,7 @@ antigo deixe de estar online:
 
 | Segredo | Onde mudar | Onde configurar no novo site |
 |---|---|---|
-| Password da base de dados (`u855228810_topcasauser`) | hPanel → Bases de Dados MySQL → Alterar password | `DB_PASSWORD` no `.env` |
+| Password da base de dados (`u738589882_topcasauser`) | hPanel → Bases de Dados MySQL → Alterar password | `DB_PASSWORD` no `.env` |
 | Password SMTP (`no-reply@topcasa.pt`) | hPanel → Emails → Alterar password | `MAIL_PASSWORD` no `.env` (até teres isto, `MAIL_MAILER=log` funciona como solução temporária) |
 | Groq API key | [console.groq.com](https://console.groq.com/keys) → revogar a antiga, criar nova | `GROQ_API_KEY` no `.env` |
 | Login do painel de admin (credenciais hardcoded no código antigo — removidas deste documento) | Já não existe — o novo painel usa contas reais (`user_type=admin`) com password normal | Confirma que a conta `admin` importada (Fase 11) tem uma password forte definida (ver passo 6) |
@@ -47,8 +47,8 @@ APP_KEY=            # gerar com `php artisan key:generate` no servidor
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
-DB_DATABASE=u855228810_topcasadb
-DB_USERNAME=u855228810_topcasauser
+DB_DATABASE=u738589882_topcasadb
+DB_USERNAME=u738589882_topcasauser
 DB_PASSWORD=         # a NOVA password do passo 2
 
 MAIL_MAILER=smtp
@@ -124,8 +124,8 @@ password" para a redefinir antes de dares o login a alguém.
 Duas entradas, ambas a cada minuto:
 
 ```
-* * * * * php /home/u855228810/topcasa-app/artisan schedule:run >> /dev/null 2>&1
-* * * * * php /home/u855228810/topcasa-app/artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
+* * * * * php /home/u738589882/topcasa-app/artisan schedule:run >> /dev/null 2>&1
+* * * * * php /home/u738589882/topcasa-app/artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
 ```
 
 - A primeira despoleta o scheduler do Laravel (expiração de anúncios, avisos,
@@ -161,7 +161,7 @@ O docroot do staging é `~/domains/topcasa.pt/public_html/staging`. O
 não passa por ele. No `.env` do staging:
 
 ```
-APP_PUBLIC_PATH=/home/u855228810/domains/topcasa.pt/public_html/staging
+APP_PUBLIC_PATH=/home/u738589882/domains/topcasa.pt/public_html/staging
 ```
 
 Sem esta linha, `config:cache` (e qualquer comando que arranque a app pela
