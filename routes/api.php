@@ -4,12 +4,18 @@ use App\Http\Controllers\Api\V1\AlertaController;
 use App\Http\Controllers\Api\V1\AnuncioController;
 use App\Http\Controllers\Api\V1\AnuncioGestaoController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BlogController;
 use App\Http\Controllers\Api\V1\CatalogoController;
+use App\Http\Controllers\Api\V1\ContaController;
 use App\Http\Controllers\Api\V1\ContactoController;
 use App\Http\Controllers\Api\V1\FavoritoController;
 use App\Http\Controllers\Api\V1\GaleriaController;
 use App\Http\Controllers\Api\V1\MensagemController;
+use App\Http\Controllers\Api\V1\NewsletterController;
+use App\Http\Controllers\Api\V1\OrcamentoController;
 use App\Http\Controllers\Api\V1\PerfilController;
+use App\Http\Controllers\Api\V1\RecrutamentoController;
+use App\Http\Controllers\Api\V1\ResumoController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,9 +32,18 @@ Route::get('distritos', [CatalogoController::class, 'distritos'])->name('api.v1.
 Route::get('distritos/{distrito}/concelhos', [CatalogoController::class, 'concelhos'])->name('api.v1.concelhos');
 Route::get('categorias', [CatalogoController::class, 'categorias'])->name('api.v1.categorias');
 
+Route::get('blog', [BlogController::class, 'index'])->name('api.v1.blog.index');
+Route::get('blog/{post}', [BlogController::class, 'show'])->name('api.v1.blog.show');
+
+Route::post('newsletter', [NewsletterController::class, 'store'])->name('api.v1.newsletter.store');
+
 Route::get('anuncios', [AnuncioController::class, 'index'])->name('api.v1.anuncios.index');
 
 Route::middleware('auth.optional')->group(function () {
+    Route::get('orcamentos', [OrcamentoController::class, 'index'])->name('api.v1.orcamentos.index');
+    Route::post('orcamentos/{orcamento}/desbloquear', [OrcamentoController::class, 'desbloquear'])->name('api.v1.orcamentos.desbloquear');
+    Route::get('recrutamento', [RecrutamentoController::class, 'index'])->name('api.v1.recrutamento.index');
+
     Route::get('anuncios/{anuncio}', [AnuncioController::class, 'show'])->name('api.v1.anuncios.show');
     Route::post('anuncios/{anuncio}/revelar-telefone', [ContactoController::class, 'telefone'])->name('api.v1.anuncios.telefone');
     Route::post('anuncios/{anuncio}/revelar-whatsapp', [ContactoController::class, 'whatsapp'])->name('api.v1.anuncios.whatsapp');
@@ -66,5 +81,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('reviews/{review}/rejeitar', [ReviewController::class, 'rejeitar'])->name('api.v1.reviews.rejeitar');
 
     Route::get('alertas', [AlertaController::class, 'index'])->name('api.v1.alertas.index');
+    Route::post('alertas/lidos', [AlertaController::class, 'marcarTodos'])->name('api.v1.alertas.lidos');
     Route::post('alertas/{alerta}/lido', [AlertaController::class, 'marcarLido'])->name('api.v1.alertas.lido');
+
+    Route::get('me/resumo', [ResumoController::class, 'show'])->name('api.v1.me.resumo');
+    Route::put('me/password', [ContaController::class, 'password'])->name('api.v1.me.password');
+    Route::delete('me', [ContaController::class, 'destroy'])->name('api.v1.me.destroy');
+
+    Route::get('me/orcamentos', [OrcamentoController::class, 'meus'])->name('api.v1.orcamentos.meus');
+    Route::post('orcamentos', [OrcamentoController::class, 'store'])->name('api.v1.orcamentos.store');
+    Route::post('orcamentos/{orcamento}/concluir', [OrcamentoController::class, 'concluir'])->name('api.v1.orcamentos.concluir');
+
+    Route::get('me/recrutamento', [RecrutamentoController::class, 'meus'])->name('api.v1.recrutamento.meus');
+    Route::post('recrutamento', [RecrutamentoController::class, 'store'])->name('api.v1.recrutamento.store');
+    Route::post('recrutamento/{recrutamento}/pausar', [RecrutamentoController::class, 'pausar'])->name('api.v1.recrutamento.pausar');
+    Route::delete('recrutamento/{recrutamento}', [RecrutamentoController::class, 'destroy'])->name('api.v1.recrutamento.destroy');
+
+    Route::get('me/reviews', [ReviewController::class, 'recebidas'])->name('api.v1.reviews.recebidas');
 });

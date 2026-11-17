@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOrcamentoRequest;
-use App\Models\DesbloqueioOrcamento;
 use App\Models\Distrito;
 use App\Models\PedidoOrcamento;
-use App\Services\ImageUploadService;
+use App\Services\PublicacaoOrcamento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -14,9 +13,7 @@ use Illuminate\View\View;
 
 class OrcamentoController extends Controller
 {
-    public function __construct(private readonly ImageUploadService $images)
-    {
-    }
+    public function __construct(private readonly PublicacaoOrcamento $pedidos) {}
 
     public function index(): View
     {
@@ -35,28 +32,7 @@ class OrcamentoController extends Controller
 
     public function store(StoreOrcamentoRequest $request): RedirectResponse
     {
-        $existeRecente = PedidoOrcamento::where('telefone', $request->string('telefone'))
-            ->where('created_at', '>=', now()->subDay())
-            ->exists();
-
-        if ($existeRecente) {
-            return back()->withErrors(['telefone' => 'Já existe um pedido recente com este telefone. Tenta novamente mais tarde.'])->withInput();
-        }
-
-        $data = $request->validated();
-
-        $pedido = PedidoOrcamento::create([
-            ...collect($data)->except(['foto', 'termo_aceite'])->all(),
-            'user_id' => Auth::id(),
-            'termo_aceite' => true,
-            // Fica pendente até ser aprovado no CRM (igual aos anúncios).
-            'status' => 'pendente',
-            'foto' => $request->hasFile('foto') ? $this->images->store($request->file('foto'), 'orcamentos') : null,
-        ]);
-
-        // No emails here: the "publicado" confirmation and the professionals'
-        // heads-up only go out once the pedido is approved in the CRM
-        // (Admin\OrcamentoController::aprovar -> PedidoAprovadoNotifier).
+        $this->pedidos->criar($request, Auth::id());
 
         return redirect()->route('orcamentos.index')->with('status', 'Pedido de orçamento submetido com sucesso! Fica pendente de aprovação.');
     }
@@ -70,33 +46,12 @@ class OrcamentoController extends Controller
      */
     public function desbloquear(PedidoOrcamento $pedido): JsonResponse
     {
-        // Pending/rejected pedidos are not public - never hand out their contacts.
-        abort_unless($pedido->isAprovado(), 404);
-
-        $pedido->increment('contacto_clicks');
-        \App\Models\ContactoEvento::registar('telefone', pedido: $pedido);
-
-        if (Auth::check()) {
-            DesbloqueioOrcamento::firstOrCreate([
-                'pedido_id' => $pedido->id,
-                'user_id' => Auth::id(),
-            ], ['created_at' => now()]);
-        }
-
-        return response()->json([
-            'nome' => $pedido->nome,
-            'telefone' => $pedido->telefone,
-            'email' => $pedido->email,
-        ]);
+        return response()->json($this->pedidos->desbloquear($pedido, Auth::id()));
     }
 
     public function concluir(PedidoOrcamento $pedido): RedirectResponse
     {
-        abort_unless(Auth::id() === $pedido->user_id || Auth::user()?->isAdmin(), 403);
-        // Only an approved, still-open pedido can be closed.
-        abort_unless($pedido->status === 'validado', 404);
-
-        $pedido->update(['status' => 'concluido']);
+        $this->pedidos->concluir($pedido, Auth::user());
 
         return back()->with('status', 'Pedido marcado como concluído.');
     }

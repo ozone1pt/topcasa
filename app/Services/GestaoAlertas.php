@@ -26,4 +26,12 @@ class GestaoAlertas
 
         return $alerta;
     }
+
+    public function marcarTodosLidos(User $user): int
+    {
+        return $user->alertas()->where('lida', false)->update([
+            'lida' => true,
+            'lida_em' => now(),
+        ]);
+    }
 }

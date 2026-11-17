@@ -21,6 +21,7 @@ class ReviewResource extends JsonResource
             'comment' => $this->comment,
             'status' => $this->status,
             'autor' => $this->relationLoaded('user') ? $this->user?->nomeCompleto() : null,
+            'anuncio_titulo' => $this->relationLoaded('anuncio') ? $this->anuncio?->titulo : null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
