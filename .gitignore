@@ -1,0 +1,65 @@
+# --- Dependencies ---
+/vendor
+/node_modules
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+/auth.json
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+*.cnf
+
+# --- Laravel runtime (logs, cache, sessions, compiled views) ---
+*.log
+/storage/*.key
+/storage/pail
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/framework/testing/*
+/bootstrap/cache/*.php
+
+# --- User uploads (live in the web root's /storage, never in git) ---
+/public/storage
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/storage/app/private/*
+!/storage/app/private/.gitignore
+/public/hot
+
+# --- Dumps, backups, archives ---
+*.sql
+*.sql.gz
+*.dump
+*.bak
+*.backup
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.rar
+*.7z
+
+# --- Tooling / OS ---
+.phpunit.result.cache
+/.phpunit.cache
+.phpactor.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+Homestead.json
+Homestead.yaml
+.DS_Store
+Thumbs.db
+
+# NOTE: /public/build is committed on purpose: the Hostinger server has no
+# Node/npm, so compiled Vite assets must come from the repo (or from CI later).
