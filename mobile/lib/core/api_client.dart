@@ -258,10 +258,17 @@ class ApiClient {
   }
 
   Future<Anuncio> atualizarAnuncio(int id, Map<String, dynamic> campos, List<File> fotos) async {
-    final response = await _dio.put<Map<String, dynamic>>(
-      'anuncios/$id',
-      data: fotos.isEmpty ? campos : await _formularioAnuncio(campos, fotos),
-    );
+    // PHP leaves $_POST and $_FILES empty on a multipart PUT. Text-only edits
+    // stay JSON PUT. New photos go as POST multipart, which Laravel accepts
+    // on this route (and as PUT when _method is set).
+    if (fotos.isEmpty) {
+      final response = await _dio.put<Map<String, dynamic>>('anuncios/$id', data: campos);
+      return Anuncio.fromJson(_mapa(response.data!['data']));
+    }
+
+    final dados = await _formularioAnuncio(campos, fotos);
+    dados.fields.add(const MapEntry('_method', 'PUT'));
+    final response = await _dio.post<Map<String, dynamic>>('anuncios/$id', data: dados);
     return Anuncio.fromJson(_mapa(response.data!['data']));
   }
 

@@ -79,6 +79,34 @@ class AnuncioGestaoApiTest extends TestCase
             ->assertJsonPath('data.titulo', 'Canalizador editado');
     }
 
+    public function test_editar_com_fotos_aceita_post_multipart(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $id = $this->postJson('/api/v1/anuncios', $this->dados())->assertCreated()->json('data.id');
+
+        $this->post('/api/v1/anuncios/'.$id, [
+            ...$this->dados(),
+            'titulo' => 'Com foto nova',
+            '_method' => 'PUT',
+            'imagens' => [UploadedFile::fake()->image('extra.jpg')],
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.titulo', 'Com foto nova')
+            ->assertJsonCount(1, 'data.imagens');
+
+        $this->post('/api/v1/anuncios/'.$id, [
+            ...$this->dados(),
+            'titulo' => 'Segunda foto',
+            'imagens' => [UploadedFile::fake()->image('mais.jpg')],
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.titulo', 'Segunda foto')
+            ->assertJsonCount(2, 'data.imagens');
+    }
+
     public function test_meus_anuncios_incluem_rejeitados_com_motivo(): void
     {
         $user = User::factory()->create();

@@ -59,12 +59,21 @@ $app = Application::configure(basePath: dirname(__DIR__))
         });
     })->create();
 
-// On this Hostinger deployment the app lives in a protected "topcasa-app"
-// folder one level above the real document root (public_html), and the
-// contents of Laravel's public/ folder were moved directly into
-// public_html so the site can be served from the domain root without SSH
-// access to change the doc root. Point Laravel at the real public path so
-// public_path() (Vite manifest, asset(), etc.) resolves correctly.
+// Production keeps the Hostinger layout: the app lives in a protected folder
+// one level above the real document root, and public/ was copied into that
+// docroot. CLI commands (config:cache, package:discover) never run index.php,
+// which is the only place staging calls usePublicPath(), so without an
+// override they would point the public disk at the production docroot.
+// APP_PUBLIC_PATH, when set, wins for both HTTP and CLI. Unset, behaviour
+// stays as before — including a staging index.php that sets the path itself.
 $app->usePublicPath(dirname(__DIR__, 2));
+
+$app->afterLoadingEnvironment(function () use ($app) {
+    $configured = $_ENV['APP_PUBLIC_PATH'] ?? $_SERVER['APP_PUBLIC_PATH'] ?? getenv('APP_PUBLIC_PATH');
+
+    if (is_string($configured) && $configured !== '') {
+        $app->usePublicPath($configured);
+    }
+});
 
 return $app;

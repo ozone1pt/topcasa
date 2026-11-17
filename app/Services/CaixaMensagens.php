@@ -84,11 +84,20 @@ class CaixaMensagens
     {
         $this->participante($mensagem, $user);
 
+        // The owner can message their own ad (same as the website). Then they
+        // are both sides of the row, and clearing only one timestamp leaves
+        // the thread visible through the other side of the inbox query.
+        $agora = now();
+
         if ($user->id === $mensagem->destinatario_id) {
-            $mensagem->update(['destinatario_deleted_at' => now()]);
-        } else {
-            $mensagem->update(['remetente_deleted_at' => now()]);
+            $mensagem->destinatario_deleted_at = $agora;
         }
+
+        if ($user->id === $mensagem->remetente_id) {
+            $mensagem->remetente_deleted_at = $agora;
+        }
+
+        $mensagem->save();
     }
 
     public function participante(Mensagem $mensagem, User $user): void

@@ -41,7 +41,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('me/anuncios', [AnuncioGestaoController::class, 'meus'])->name('api.v1.anuncios.meus');
     Route::post('anuncios', [AnuncioGestaoController::class, 'store'])->name('api.v1.anuncios.store');
-    Route::put('anuncios/{anuncio}', [AnuncioGestaoController::class, 'update'])->name('api.v1.anuncios.update');
+    // PHP does not parse multipart bodies on PUT. The app sends JSON for a
+    // text-only edit, and POST multipart (with or without _method=PUT) when
+    // photos are attached. Both verbs hit the same action.
+    Route::match(['put', 'post'], 'anuncios/{anuncio}', [AnuncioGestaoController::class, 'update'])->name('api.v1.anuncios.update');
     Route::delete('anuncios/{anuncio}', [AnuncioGestaoController::class, 'destroy'])->name('api.v1.anuncios.destroy');
     Route::post('anuncios/{anuncio}/reativar', [AnuncioGestaoController::class, 'reativar'])->name('api.v1.anuncios.reativar');
 

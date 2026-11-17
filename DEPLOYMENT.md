@@ -153,3 +153,36 @@ para o site novo. Mantém o backup do `_public_html` e do dump SQL antigos
 num local seguro por uns meses, para o caso de precisares de consultar algo,
 mas **não** os deixes acessíveis publicamente (têm as credenciais antigas
 hardcoded).
+
+## Deploy no staging
+
+O docroot do staging é `~/domains/topcasa.pt/public_html/staging`. O
+`index.php` dessa pasta chama `usePublicPath(__DIR__)`, mas o `php artisan`
+não passa por ele. No `.env` do staging:
+
+```
+APP_PUBLIC_PATH=/home/u855228810/domains/topcasa.pt/public_html/staging
+```
+
+Sem esta linha, `config:cache` (e qualquer comando que arranque a app pela
+CLI) aponta o disco `public` para `~/domains/topcasa.pt/storage`, a pasta de
+produção. Em produção a variável fica vazia: o fallback continua a ser a
+pasta imediatamente acima da aplicação.
+
+O `proc_open` está desligado neste PHP, e o `composer install` normal corre
+`package:discover` no fim. Se esse script falha, pode apagar
+`bootstrap/cache/packages.php`. Instala sem scripts e descobre os pacotes à
+parte:
+
+```bash
+cd ~/topcasa-app
+git pull origin staging
+composer install --no-dev --optimize-autoloader --no-scripts
+php artisan package:discover
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Não é preciso Node neste servidor: os assets compilados já vêm no repositório.
