@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreRecrutamentoRequest;
-use App\Jobs\NotificarNovoRecrutamento;
 use App\Models\Distrito;
 use App\Models\PedidoRecrutamento;
 use App\Services\ImageUploadService;
-use App\Services\PedidoPublicadoNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -41,23 +39,24 @@ class RecrutamentoController extends Controller
             ...collect($data)->except(['foto', 'termo_aceite'])->all(),
             'user_id' => Auth::id(),
             'termo_aceite' => true,
-            'status' => 'ativo',
+            // Fica pendente até ser aprovada no CRM (igual aos anúncios).
+            'status' => 'pendente',
             'foto' => $request->hasFile('foto') ? $this->images->store($request->file('foto'), 'recrutamento') : null,
         ]);
 
-        // Emails go out right after the response is sent (nothing is queued -
-        // this host has no queue worker, so a queued job would sit unprocessed
-        // forever): first the confirmation to whoever published the vaga, then
-        // the heads-up to the professionals.
-        app()->terminating(fn () => app(PedidoPublicadoNotifier::class)->notificar('recrutamento', $pedido->id, $pedido->email, $pedido->titulo));
-        NotificarNovoRecrutamento::dispatchAfterResponse($pedido);
+        // No emails here: the "publicada" confirmation and the professionals'
+        // heads-up only go out once the vaga is approved in the CRM
+        // (Admin\RecrutamentoController::aprovar -> PedidoAprovadoNotifier).
 
-        return redirect()->route('recrutamentos.index')->with('status', 'Vaga publicada.');
+        return redirect()->route('recrutamentos.index')->with('status', 'Vaga submetida com sucesso! Fica pendente de aprovação.');
     }
 
     public function pausar(PedidoRecrutamento $pedido): RedirectResponse
     {
         $this->authorizeOwner($pedido);
+        // Pausar/reativar is only for approved vagas - a pending or rejected
+        // one must never be switched to "ativo" without going through the CRM.
+        abort_unless(in_array($pedido->status, ['ativo', 'pausado'], true), 404);
 
         $pedido->update(['status' => $pedido->status === 'ativo' ? 'pausado' : 'ativo']);
 
