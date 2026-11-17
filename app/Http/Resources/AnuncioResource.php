@@ -26,8 +26,10 @@ class AnuncioResource extends JsonResource
         ])->values();
 
         $capa = $imagens->first();
+        $dono = $request->user()
+            && ($request->user()->id === $this->user_id || $request->user()->isAdmin());
 
-        return [
+        $dados = [
             'id' => $this->id,
             'slug' => $this->slug,
             'titulo' => $this->titulo,
@@ -56,6 +58,36 @@ class AnuncioResource extends JsonResource
             'imagens' => $imagens,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
+
+        if ($this->relationLoaded('favoritos') && $request->user()) {
+            $dados['favorito'] = $this->favoritos->contains('user_id', $request->user()->id);
+        }
+
+        if ($this->relationLoaded('reviews')) {
+            $dados['reviews'] = $this->reviews->map(fn ($review) => [
+                'id' => $review->id,
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'status' => $review->status,
+                'autor' => $review->relationLoaded('user') ? $review->user?->nomeCompleto() : null,
+                'created_at' => $review->created_at?->toIso8601String(),
+            ])->values();
+        }
+
+        if ($dono) {
+            $dados['status'] = $this->status;
+            $dados['motivo_rejeicao'] = $this->motivo_rejeicao;
+            $dados['contacto'] = $this->contacto;
+            $dados['email'] = $this->email;
+            $dados['youtube_link'] = $this->youtube_link;
+            $dados['instagram_link'] = $this->instagram_link;
+            $dados['categoria_id'] = $this->categoria_id;
+            $dados['distrito_id'] = $this->distrito_id;
+            $dados['concelho_id'] = $this->concelho_id;
+            $dados['data_expiracao'] = $this->data_expiracao?->toIso8601String();
+        }
+
+        return $dados;
     }
 
     /**

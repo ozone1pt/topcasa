@@ -27,8 +27,9 @@ String mensagemErro(Object erro) {
 
     if (erro.type == DioExceptionType.connectionTimeout ||
         erro.type == DioExceptionType.receiveTimeout ||
+        erro.type == DioExceptionType.sendTimeout ||
         erro.type == DioExceptionType.connectionError) {
-      return 'Sem ligação ao servidor. Verifica a internet e tenta outra vez.';
+      return 'A ligação ao servidor demorou demasiado. Tenta outra vez daqui a pouco.';
     }
   }
 

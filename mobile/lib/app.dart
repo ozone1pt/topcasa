@@ -3,10 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:topcasa/core/theme.dart';
 import 'package:topcasa/providers/providers.dart';
+import 'package:topcasa/screens/alertas_screen.dart';
 import 'package:topcasa/screens/anuncio_detail_screen.dart';
+import 'package:topcasa/screens/anuncio_form_screen.dart';
+import 'package:topcasa/screens/favoritos_screen.dart';
 import 'package:topcasa/screens/forgot_password_screen.dart';
 import 'package:topcasa/screens/home_screen.dart';
 import 'package:topcasa/screens/login_screen.dart';
+import 'package:topcasa/screens/mensagens_screen.dart';
+import 'package:topcasa/screens/meus_anuncios_screen.dart';
 import 'package:topcasa/screens/profile_screen.dart';
 import 'package:topcasa/screens/register_screen.dart';
 import 'package:topcasa/screens/splash_screen.dart';
@@ -44,7 +49,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (local == '/splash') {
         return '/';
       }
-      if (local == '/perfil' && !auth.autenticado) {
+      const reservadas = {'/perfil', '/meus-anuncios', '/favoritos', '/mensagens', '/alertas', '/anuncios/novo'};
+      final reservada = reservadas.contains(local) || local.endsWith('/editar') || local.startsWith('/mensagens/');
+      if (reservada && !auth.autenticado) {
         return '/login';
       }
       if (auth.autenticado && publicas.contains(local)) {
@@ -58,12 +65,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/registar', builder: (_, _) => const RegisterScreen()),
       GoRoute(path: '/recuperar', builder: (_, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
+      GoRoute(path: '/anuncios/novo', builder: (_, _) => const AnuncioFormScreen()),
+      GoRoute(path: '/meus-anuncios', builder: (_, _) => const MeusAnunciosScreen()),
+      GoRoute(path: '/favoritos', builder: (_, _) => const FavoritosScreen()),
+      GoRoute(path: '/mensagens', builder: (_, _) => const MensagensScreen()),
+      GoRoute(
+        path: '/mensagens/:id',
+        builder: (_, state) => MensagemScreen(id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0),
+      ),
+      GoRoute(path: '/alertas', builder: (_, _) => const AlertasScreen()),
       GoRoute(
         path: '/anuncios/:id',
         builder: (_, state) {
           final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
           return AnuncioDetailScreen(id: id);
         },
+        routes: [
+          GoRoute(
+            path: 'editar',
+            builder: (_, state) => AnuncioFormScreen(anuncioId: int.tryParse(state.pathParameters['id'] ?? '')),
+          ),
+        ],
       ),
       GoRoute(path: '/perfil', builder: (_, _) => const ProfileScreen()),
     ],
