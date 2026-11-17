@@ -6,15 +6,18 @@ use App\Http\Requests\StoreAnuncioRequest;
 use App\Http\Requests\UpdateAnuncioRequest;
 use App\Models\Anuncio;
 use App\Models\Categoria;
+use App\Models\Configuracao;
+use App\Models\ContactoEvento;
 use App\Models\Distrito;
 use App\Models\GaleriaAnuncio;
-use App\Models\Configuracao;
 use App\Models\User;
 use App\Notifications\AccountAutoCreatedNotification;
+use App\Services\AnuncioListagem;
 use App\Services\AnuncioPublicadoNotifier;
 use App\Services\ContactoReveladoNotifier;
 use App\Services\ImageUploadService;
 use App\Services\ModeracaoService;
+use App\Services\UsernameGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,8 +34,9 @@ class AnuncioController extends Controller
         private readonly ModeracaoService $moderacao,
         private readonly ContactoReveladoNotifier $contactoNotifier,
         private readonly AnuncioPublicadoNotifier $publicadoNotifier,
-    ) {
-    }
+        private readonly AnuncioListagem $listagem,
+        private readonly UsernameGenerator $usernames,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -45,20 +49,13 @@ class AnuncioController extends Controller
             $request->session()->put('lista_seed', random_int(1, 999999));
         }
 
-        $anuncios = Anuncio::query()
-            ->publicados()
-            ->with(['categoria', 'distrito', 'concelho', 'galeria', 'user'])
-            ->when($request->filled('categoria_id'), fn ($q) => $q->where('categoria_id', $request->integer('categoria_id')))
-            ->when($request->filled('distrito_id'), fn ($q) => $q->where('distrito_id', $request->integer('distrito_id')))
-            ->when($request->filled('concelho_id'), fn ($q) => $q->where('concelho_id', $request->integer('concelho_id')))
-            ->when($request->filled('busca'), function ($q) use ($request) {
-                $termo = '%'.$request->string('busca').'%';
-                $q->where(fn ($q) => $q->where('titulo', 'like', $termo)->orWhere('descricao', 'like', $termo));
-            })
-            ->orderByRaw('RAND(?)', [(int) $request->session()->get('lista_seed')])
-            ->orderByDesc('id')
-            ->paginate(12)
-            ->withQueryString();
+        $anuncios = $this->listagem->publicados(
+            categoriaId: $request->filled('categoria_id') ? $request->integer('categoria_id') : null,
+            distritoId: $request->filled('distrito_id') ? $request->integer('distrito_id') : null,
+            concelhoId: $request->filled('concelho_id') ? $request->integer('concelho_id') : null,
+            termo: $request->filled('busca') ? (string) $request->string('busca') : null,
+            seed: (int) $request->session()->get('lista_seed'),
+        )->paginate(AnuncioListagem::POR_PAGINA)->withQueryString();
 
         return view('anuncios.index', [
             'anuncios' => $anuncios,
@@ -103,7 +100,7 @@ class AnuncioController extends Controller
                 $plainPassword = Str::random(12);
 
                 $user = User::create([
-                    'username' => $this->generateUniqueUsername($data['email']),
+                    'username' => $this->usernames->fromSeed($data['email']),
                     'email' => $data['email'],
                     'nome' => $data['minha_empresa'],
                     'telefone' => Str::limit($data['contacto'], 30, ''),
@@ -254,7 +251,7 @@ class AnuncioController extends Controller
         $this->authorize('view', $anuncio);
 
         $anuncio->increment('phone_clicks');
-        \App\Models\ContactoEvento::registar('telefone', $anuncio);
+        ContactoEvento::registar('telefone', $anuncio);
 
         // Tell the owner someone saved their contact - after the response is
         // sent so a slow mail server never delays showing the number.
@@ -276,7 +273,7 @@ class AnuncioController extends Controller
         abort_unless($url, 404);
 
         $anuncio->increment('whatsapp_clicks');
-        \App\Models\ContactoEvento::registar('whatsapp', $anuncio);
+        ContactoEvento::registar('whatsapp', $anuncio);
 
         return response()->json(['url' => $url]);
     }
@@ -333,18 +330,5 @@ class AnuncioController extends Controller
         $this->images->rotate($imagem->imagem, $request->input('sentido') === 'direita');
 
         return response()->json(['url' => Storage::url($imagem->imagem).'?v='.time()]);
-    }
-
-    private function generateUniqueUsername(string $email): string
-    {
-        $base = Str::slug(Str::before($email, '@')) ?: 'user';
-        $username = $base;
-        $suffix = 1;
-
-        while (User::where('username', $username)->exists()) {
-            $username = $base.$suffix++;
-        }
-
-        return $username;
     }
 }

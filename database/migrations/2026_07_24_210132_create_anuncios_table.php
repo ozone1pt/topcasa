@@ -28,7 +28,7 @@ return new class extends Migration
             $table->decimal('preco', 10, 2)->nullable();
             $table->boolean('destacar')->default(false);
             $table->string('youtube_link')->nullable();
-            $table->enum('status', ['pendente', 'aprovado', 'rejeitado', 'expirado'])->default('pendente');
+            $table->enum('status', ['rascunho', 'pendente', 'aprovado', 'rejeitado', 'expirado'])->default('pendente');
             $table->text('motivo_rejeicao')->nullable();
             $table->timestamp('data_expiracao')->nullable();
             $table->timestamp('aviso_expiracao_enviado_em')->nullable();

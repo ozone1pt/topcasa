@@ -22,8 +22,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE pedidos_orcamento MODIFY status ENUM('pendente', 'validado', 'rejeitado', 'concluido') NOT NULL DEFAULT 'pendente'");
-        DB::statement("ALTER TABLE pedidos_recrutamento MODIFY status ENUM('pendente', 'ativo', 'pausado', 'rejeitado', 'cancelado') NOT NULL DEFAULT 'pendente'");
+        // SQLite não tem ALTER ... MODIFY ENUM. O enum lá é texto, por isso os
+        // valores novos já cabem; em MySQL o statement é o de produção.
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE pedidos_orcamento MODIFY status ENUM('pendente', 'validado', 'rejeitado', 'concluido') NOT NULL DEFAULT 'pendente'");
+            DB::statement("ALTER TABLE pedidos_recrutamento MODIFY status ENUM('pendente', 'ativo', 'pausado', 'rejeitado', 'cancelado') NOT NULL DEFAULT 'pendente'");
+        }
 
         Schema::table('pedidos_orcamento', function (Blueprint $table) {
             $table->text('motivo_rejeicao')->nullable()->after('notas_admin');
@@ -41,8 +45,10 @@ return new class extends Migration
         DB::statement("UPDATE pedidos_orcamento SET status = 'concluido' WHERE status IN ('pendente', 'rejeitado')");
         DB::statement("UPDATE pedidos_recrutamento SET status = 'cancelado' WHERE status IN ('pendente', 'rejeitado')");
 
-        DB::statement("ALTER TABLE pedidos_orcamento MODIFY status ENUM('validado', 'concluido') NOT NULL DEFAULT 'validado'");
-        DB::statement("ALTER TABLE pedidos_recrutamento MODIFY status ENUM('ativo', 'pausado', 'cancelado') NOT NULL DEFAULT 'ativo'");
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE pedidos_orcamento MODIFY status ENUM('validado', 'concluido') NOT NULL DEFAULT 'validado'");
+            DB::statement("ALTER TABLE pedidos_recrutamento MODIFY status ENUM('ativo', 'pausado', 'cancelado') NOT NULL DEFAULT 'ativo'");
+        }
 
         Schema::table('pedidos_orcamento', function (Blueprint $table) {
             $table->dropColumn('motivo_rejeicao');

@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\UsernameGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class GoogleAuthController extends Controller
@@ -17,7 +17,7 @@ class GoogleAuthController extends Controller
         return Socialite::driver('google')->redirect();
     }
 
-    public function callback(): RedirectResponse
+    public function callback(UsernameGenerator $usernames): RedirectResponse
     {
         try {
             $googleUser = Socialite::driver('google')->user();
@@ -41,7 +41,7 @@ class GoogleAuthController extends Controller
 
         if (! $user) {
             $user = User::create([
-                'username' => $this->generateUniqueUsername($googleUser->getEmail() ?? $googleUser->getName()),
+                'username' => $usernames->fromSeed($googleUser->getEmail() ?? $googleUser->getName() ?? 'user'),
                 'email' => $googleUser->getEmail(),
                 'nome' => $googleUser->getName(),
                 'password' => bin2hex(random_bytes(16)),
@@ -58,18 +58,5 @@ class GoogleAuthController extends Controller
         Auth::login($user, true);
 
         return redirect()->intended(route('dashboard', absolute: false));
-    }
-
-    private function generateUniqueUsername(string $seed): string
-    {
-        $base = Str::slug(Str::before($seed, '@')) ?: 'user';
-        $username = $base;
-        $suffix = 1;
-
-        while (User::where('username', $username)->exists()) {
-            $username = $base.$suffix++;
-        }
-
-        return $username;
     }
 }
