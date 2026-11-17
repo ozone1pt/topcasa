@@ -22,7 +22,7 @@ return new class extends Migration
             $table->text('descricao');
             $table->string('foto')->nullable();
             $table->boolean('termo_aceite')->default(false);
-            $table->enum('status', ['validado', 'concluido'])->default('validado');
+            $table->enum('status', ['pendente', 'validado', 'rejeitado', 'concluido'])->default('pendente');
             $table->unsignedInteger('views')->default(0);
             $table->timestamps();
         });

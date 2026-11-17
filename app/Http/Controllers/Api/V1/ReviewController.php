@@ -10,6 +10,7 @@ use App\Services\GestaoAvaliacoes;
 use App\Services\ResolvedorAnuncio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ReviewController extends Controller
 {
@@ -17,6 +18,17 @@ class ReviewController extends Controller
         private readonly GestaoAvaliacoes $avaliacoes,
         private readonly ResolvedorAnuncio $anuncios,
     ) {}
+
+    public function recebidas(Request $request): AnonymousResourceCollection
+    {
+        $reviews = Review::query()
+            ->where('anunciante_id', $request->user()->id)
+            ->with(['user', 'anuncio'])
+            ->orderByDesc('id')
+            ->paginate(15);
+
+        return ReviewResource::collection($reviews);
+    }
 
     public function store(StoreReviewRequest $request, string $anuncio): JsonResponse
     {

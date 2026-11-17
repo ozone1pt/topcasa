@@ -355,6 +355,99 @@ class ApiClient {
     return response.data?['url'] as String? ?? '';
   }
 
+  Future<PaginaSimples<PedidoResumo>> orcamentos({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('orcamentos', queryParameters: {'page': pagina});
+    return _pagina(response.data!, PedidoResumo.fromJson);
+  }
+
+  Future<PaginaSimples<PedidoResumo>> meusOrcamentos({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('me/orcamentos', queryParameters: {'page': pagina});
+    return _pagina(response.data!, PedidoResumo.fromJson);
+  }
+
+  Future<PedidoResumo> criarOrcamento(Map<String, dynamic> campos, File? foto) async {
+    final response = await _dio.post<Map<String, dynamic>>('orcamentos', data: await _formularioPedido(campos, foto));
+    return PedidoResumo.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<Map<String, dynamic>> desbloquearOrcamento(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('orcamentos/$id/desbloquear');
+    return response.data ?? {};
+  }
+
+  Future<void> concluirOrcamento(int id) => _dio.post<void>('orcamentos/$id/concluir');
+
+  Future<PaginaSimples<PedidoResumo>> recrutamento({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('recrutamento', queryParameters: {'page': pagina});
+    return _pagina(response.data!, PedidoResumo.fromJson);
+  }
+
+  Future<PaginaSimples<PedidoResumo>> meuRecrutamento({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('me/recrutamento', queryParameters: {'page': pagina});
+    return _pagina(response.data!, PedidoResumo.fromJson);
+  }
+
+  Future<PedidoResumo> criarRecrutamento(Map<String, dynamic> campos, File? foto) async {
+    final response = await _dio.post<Map<String, dynamic>>('recrutamento', data: await _formularioPedido(campos, foto));
+    return PedidoResumo.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<PedidoResumo> pausarRecrutamento(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('recrutamento/$id/pausar');
+    return PedidoResumo.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<void> apagarRecrutamento(int id) => _dio.delete<void>('recrutamento/$id');
+
+  Future<ResumoConta> resumo() async {
+    final response = await _dio.get<Map<String, dynamic>>('me/resumo');
+    return ResumoConta.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<PaginaSimples<AvaliacaoRecebida>> reviewsRecebidas() async {
+    final response = await _dio.get<Map<String, dynamic>>('me/reviews');
+    return _pagina(response.data!, AvaliacaoRecebida.fromJson);
+  }
+
+  Future<void> moderarReview(int id, bool aprovar) =>
+      _dio.post<void>('reviews/$id/${aprovar ? 'aprovar' : 'rejeitar'}');
+
+  Future<void> marcarAlertasLidos() => _dio.post<void>('alertas/lidos');
+
+  Future<void> alterarPassword(String atual, String nova) => _dio.put<void>('me/password', data: {
+        'current_password': atual,
+        'password': nova,
+        'password_confirmation': nova,
+      });
+
+  Future<void> apagarConta(String password) => _dio.delete<void>('me', data: {'password': password});
+
+  Future<PaginaSimples<Artigo>> blog({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('blog', queryParameters: {'page': pagina});
+    return _pagina(response.data!, Artigo.fromJson);
+  }
+
+  Future<Artigo> artigo(String slug) async {
+    final response = await _dio.get<Map<String, dynamic>>('blog/$slug');
+    return Artigo.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<void> subscreverNewsletter(String email, String? nome) => _dio.post<void>('newsletter', data: {
+        'email': email.trim().toLowerCase(),
+        if (nome != null && nome.trim().isNotEmpty) 'nome': nome.trim(),
+      });
+
+  Future<FormData> _formularioPedido(Map<String, dynamic> campos, File? foto) async {
+    final dados = FormData.fromMap({
+      for (final entrada in campos.entries)
+        if (entrada.value != null) entrada.key: entrada.value,
+    });
+    if (foto != null) {
+      dados.files.add(MapEntry('foto', await MultipartFile.fromFile(foto.path, filename: 'foto.jpg')));
+    }
+    return dados;
+  }
+
   Future<FormData> _formularioAnuncio(Map<String, dynamic> campos, List<File> fotos) async {
     final dados = FormData.fromMap({
       for (final entrada in campos.entries)
