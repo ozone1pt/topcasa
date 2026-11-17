@@ -1,0 +1,32 @@
+name: topcasa
+description: Aplicação Android da TopCasa.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dio: ^5.9.0
+  flutter_riverpod: ^2.6.1
+  flutter_secure_storage: ^9.2.4
+  go_router: ^14.8.1
+  material_ui: ^1.11.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/logo-topcasa-full.png
+    - assets/images/logo-topcasa-icon-square.png
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat.ttf

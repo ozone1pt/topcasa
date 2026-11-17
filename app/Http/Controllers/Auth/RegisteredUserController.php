@@ -3,14 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\Registered;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Services\RegistoUtilizador;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
@@ -20,41 +16,16 @@ class RegisteredUserController extends Controller
         return view('auth.register');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(RegisterRequest $request, RegistoUtilizador $registo): RedirectResponse
     {
-        $request->validate([
-            'nome' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
-
-        $user = User::create([
-            'username' => $this->generateUniqueUsername($request->email),
-            'nome' => $request->nome,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'user_type' => 'cliente',
-            'status' => 'aprovado',
-            'email_verified_at' => now(),
-        ]);
-
-        event(new Registered($user));
+        $user = $registo->criar(
+            $request->string('nome')->toString(),
+            $request->string('email')->toString(),
+            $request->string('password')->toString(),
+        );
 
         Auth::login($user);
 
         return redirect(route('dashboard', absolute: false));
-    }
-
-    private function generateUniqueUsername(string $seed): string
-    {
-        $base = Str::slug(Str::before($seed, '@')) ?: 'user';
-        $username = $base;
-        $suffix = 1;
-
-        while (User::where('username', $username)->exists()) {
-            $username = $base.$suffix++;
-        }
-
-        return $username;
     }
 }
