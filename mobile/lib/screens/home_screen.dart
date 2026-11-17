@@ -66,17 +66,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: _filtros,
             icon: Icon(estado.filtro.ativo ? Icons.filter_alt : Icons.filter_alt_outlined),
           ),
-          if (auth.autenticado)
-            IconButton(
-              tooltip: 'Perfil',
-              onPressed: () => context.push('/perfil'),
-              icon: const Icon(Icons.person_outline),
-            )
-          else
-            TextButton(
-              onPressed: () => context.push('/login'),
-              child: const Text('Entrar', style: TextStyle(color: Colors.white)),
-            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            onSelected: (destino) {
+              if (destino == '/login') {
+                context.push('/login');
+                return;
+              }
+              if (!auth.autenticado) {
+                context.push('/login');
+                return;
+              }
+              context.push(destino);
+            },
+            itemBuilder: (context) => [
+              if (!auth.autenticado)
+                const PopupMenuItem(value: '/login', child: Text('Entrar'))
+              else ...[
+                const PopupMenuItem(value: '/anuncios/novo', child: Text('Publicar anúncio')),
+                const PopupMenuItem(value: '/meus-anuncios', child: Text('Os meus anúncios')),
+                const PopupMenuItem(value: '/favoritos', child: Text('Favoritos')),
+                const PopupMenuItem(value: '/mensagens', child: Text('Mensagens')),
+                const PopupMenuItem(value: '/alertas', child: Text('Alertas')),
+                const PopupMenuItem(value: '/perfil', child: Text('Perfil')),
+              ],
+            ],
+          ),
         ],
       ),
       body: Column(

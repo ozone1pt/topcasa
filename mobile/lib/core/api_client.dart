@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:topcasa/core/config.dart';
 import 'package:topcasa/core/token_storage.dart';
 import 'package:topcasa/models/anuncio.dart';
 import 'package:topcasa/models/catalogo.dart';
 import 'package:topcasa/models/filtro_anuncios.dart';
+import 'package:topcasa/models/social.dart';
 import 'package:topcasa/models/user.dart';
 
 class ApiClient {
@@ -13,8 +16,11 @@ class ApiClient {
             Dio(
               BaseOptions(
                 baseUrl: AppConfig.baseUrlNormalizado,
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 20),
+                // O hCDN da Hostinger às vezes fica 25–60s pendurado.
+                connectTimeout: const Duration(seconds: 30),
+                receiveTimeout: const Duration(seconds: 90),
+                sendTimeout: const Duration(seconds: 90),
+                followRedirects: false,
                 headers: {
                   'Accept': 'application/json',
                   'Content-Type': 'application/json',
@@ -24,6 +30,9 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
+          if (options.data is FormData) {
+            options.headers.remove(Headers.contentTypeHeader);
+          }
           final token = _token;
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -31,6 +40,15 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
+          if (await _repetir(error)) {
+            try {
+              final resposta = await _dio.fetch<dynamic>(error.requestOptions);
+              handler.resolve(resposta);
+              return;
+            } on DioException catch (novo) {
+              error = novo;
+            }
+          }
           final path = error.requestOptions.path;
           final emAuth = path.contains('auth/login') || path.contains('auth/register');
           if (error.response?.statusCode == 401 && !emAuth) {
@@ -124,6 +142,14 @@ class ApiClient {
   }
 
   Future<Utilizador> atualizarPerfil(Map<String, dynamic> dados) async {
+    final email = (dados['email'] as String?)?.trim().toLowerCase() ?? '';
+    if (email.isEmpty) {
+      throw DioException(
+        requestOptions: RequestOptions(path: 'me'),
+        message: 'O email é obrigatório.',
+      );
+    }
+    dados['email'] = email;
     final response = await _dio.put<Map<String, dynamic>>('me', data: dados);
     return Utilizador.fromJson(_mapa(response.data!['data']));
   }
@@ -177,6 +203,169 @@ class ApiClient {
   Future<Utilizador> _sessao(Map<String, dynamic> corpo) async {
     await _gravarToken(corpo['token'] as String);
     return Utilizador.fromJson(_mapa(corpo['user']));
+  }
+
+  Future<bool> _repetir(DioException erro) async {
+    final pedido = erro.requestOptions;
+    final tentativa = pedido.extra['tentativa'] as int? ?? 0;
+    if (tentativa >= 3 || !_deveRepetir(erro)) {
+      return false;
+    }
+    pedido.extra['tentativa'] = tentativa + 1;
+    await Future<void>.delayed(Duration(milliseconds: 700 * (1 << tentativa)));
+    return true;
+  }
+
+  bool _deveRepetir(DioException erro) {
+    if (_redirecionamentoParaOMesmoCaminho(erro)) {
+      return true;
+    }
+    final metodo = erro.requestOptions.method.toUpperCase();
+    if (metodo != 'GET' && metodo != 'HEAD') {
+      return false;
+    }
+    final codigo = erro.response?.statusCode;
+    return erro.type == DioExceptionType.connectionTimeout ||
+        erro.type == DioExceptionType.receiveTimeout ||
+        erro.type == DioExceptionType.sendTimeout ||
+        erro.type == DioExceptionType.connectionError ||
+        codigo == 502 ||
+        codigo == 503 ||
+        codigo == 504;
+  }
+
+  bool _redirecionamentoParaOMesmoCaminho(DioException erro) {
+    final codigo = erro.response?.statusCode;
+    if (codigo != 307 && codigo != 302 && codigo != 301) {
+      return false;
+    }
+    final location = erro.response?.headers.value('location');
+    if (location == null || location.isEmpty) {
+      return false;
+    }
+    final destino = Uri.parse(location);
+    final pedido = erro.requestOptions.uri;
+    final caminhoDestino = destino.hasScheme ? destino.path : location.split('?').first;
+    return caminhoDestino == pedido.path || caminhoDestino.endsWith(pedido.path);
+  }
+
+  Future<Anuncio> criarAnuncio(Map<String, dynamic> campos, List<File> fotos) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'anuncios',
+      data: await _formularioAnuncio(campos, fotos),
+    );
+    return Anuncio.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<Anuncio> atualizarAnuncio(int id, Map<String, dynamic> campos, List<File> fotos) async {
+    final response = await _dio.put<Map<String, dynamic>>(
+      'anuncios/$id',
+      data: fotos.isEmpty ? campos : await _formularioAnuncio(campos, fotos),
+    );
+    return Anuncio.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<void> apagarAnuncio(int id) => _dio.delete<void>('anuncios/$id');
+
+  Future<Anuncio> reativarAnuncio(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('anuncios/$id/reativar');
+    return Anuncio.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<PaginaSimples<Anuncio>> meusAnuncios({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('me/anuncios', queryParameters: {'page': pagina});
+    return _pagina(response.data!, Anuncio.fromJson);
+  }
+
+  Future<bool> alternarFavorito(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('anuncios/$id/favorito');
+    return response.data?['favorito'] as bool? ?? false;
+  }
+
+  Future<List<Anuncio>> favoritos() async {
+    final response = await _dio.get<Map<String, dynamic>>('favoritos');
+    return _lista(response.data!['data']).map(Anuncio.fromJson).toList();
+  }
+
+  Future<String> revelarTelefone(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('anuncios/$id/revelar-telefone');
+    return response.data?['contacto'] as String? ?? '';
+  }
+
+  Future<String> revelarWhatsapp(int id) async {
+    final response = await _dio.post<Map<String, dynamic>>('anuncios/$id/revelar-whatsapp');
+    return response.data?['url'] as String? ?? '';
+  }
+
+  Future<void> enviarMensagem(int anuncioId, String texto) async {
+    await _dio.post<void>('anuncios/$anuncioId/mensagens', data: {'mensagem': texto});
+  }
+
+  Future<({List<MensagemResumo> itens, int naoLidas})> mensagens({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('mensagens', queryParameters: {'page': pagina});
+    final corpo = response.data!;
+    return (
+      itens: _lista(corpo['data']).map(MensagemResumo.fromJson).toList(),
+      naoLidas: corpo['nao_lidas'] as int? ?? 0,
+    );
+  }
+
+  Future<MensagemResumo> mensagem(int id) async {
+    final response = await _dio.get<Map<String, dynamic>>('mensagens/$id');
+    return MensagemResumo.fromJson(_mapa(response.data!['data']));
+  }
+
+  Future<void> responderMensagem(int id, String texto) async {
+    await _dio.post<void>('mensagens/$id/responder', data: {'mensagem': texto});
+  }
+
+  Future<void> apagarMensagem(int id) => _dio.delete<void>('mensagens/$id');
+
+  Future<void> avaliar(int anuncioId, int rating, String? comentario) async {
+    await _dio.post<void>('anuncios/$anuncioId/reviews', data: {
+      'rating': rating,
+      if (comentario != null && comentario.trim().isNotEmpty) 'comment': comentario.trim(),
+    });
+  }
+
+  Future<({List<AlertaResumo> itens, int naoLidas})> alertas({int pagina = 1}) async {
+    final response = await _dio.get<Map<String, dynamic>>('alertas', queryParameters: {'page': pagina});
+    final corpo = response.data!;
+    return (
+      itens: _lista(corpo['data']).map(AlertaResumo.fromJson).toList(),
+      naoLidas: corpo['nao_lidas'] as int? ?? 0,
+    );
+  }
+
+  Future<void> marcarAlertaLido(int id) => _dio.post<void>('alertas/$id/lido');
+
+  Future<void> apagarImagem(int id) => _dio.delete<void>('galeria/$id');
+
+  Future<void> ordenarImagens(List<int> ids) => _dio.post<void>('galeria/ordenar', data: {'ids': ids});
+
+  Future<String> rodarImagem(int id, String sentido) async {
+    final response = await _dio.post<Map<String, dynamic>>('galeria/$id/rodar', data: {'sentido': sentido});
+    return response.data?['url'] as String? ?? '';
+  }
+
+  Future<FormData> _formularioAnuncio(Map<String, dynamic> campos, List<File> fotos) async {
+    final dados = FormData.fromMap({
+      for (final entrada in campos.entries)
+        if (entrada.value != null) entrada.key: entrada.value,
+    });
+    for (final foto in fotos) {
+      dados.files.add(MapEntry('imagens[]', await MultipartFile.fromFile(foto.path, filename: 'foto.jpg')));
+    }
+    return dados;
+  }
+
+  PaginaSimples<T> _pagina<T>(Map<String, dynamic> corpo, T Function(Map<String, dynamic>) ler) {
+    final meta = corpo['meta'] is Map ? _mapa(corpo['meta']) : <String, dynamic>{};
+    return PaginaSimples(
+      itens: _lista(corpo['data']).map(ler).toList(),
+      pagina: meta['current_page'] as int? ?? 1,
+      ultima: meta['last_page'] as int? ?? 1,
+    );
   }
 
   Map<String, dynamic> _mapa(Object? valor) => Map<String, dynamic>.from(valor as Map);
