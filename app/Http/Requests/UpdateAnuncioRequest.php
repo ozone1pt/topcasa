@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Anuncio;
+use App\Services\ResolvedorAnuncio;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -10,7 +12,19 @@ class UpdateAnuncioRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('update', $this->route('anuncio')) ?? false;
+        $anuncio = $this->route('anuncio');
+
+        if ($anuncio instanceof Anuncio) {
+            return $this->user()?->can('update', $anuncio) ?? false;
+        }
+
+        if (! is_string($anuncio) || ! ctype_digit($anuncio)) {
+            return false;
+        }
+
+        $model = app(ResolvedorAnuncio::class)->porChave($anuncio);
+
+        return $this->user()?->can('update', $model) ?? false;
     }
 
     /**

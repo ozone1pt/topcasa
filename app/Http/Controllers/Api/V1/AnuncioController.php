@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AnuncioResource;
-use App\Models\Anuncio;
 use App\Services\AnuncioListagem;
+use App\Services\ResolvedorAnuncio;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AnuncioController extends Controller
 {
-    public function __construct(private readonly AnuncioListagem $listagem) {}
+    public function __construct(
+        private readonly AnuncioListagem $listagem,
+        private readonly ResolvedorAnuncio $anuncios,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -43,17 +46,25 @@ class AnuncioController extends Controller
      * Lookup by numeric id or by slug. Visibility matches the website policy:
      * approved anúncios are public; anything else is only for the owner or an admin.
      */
-    public function show(string $anuncio): AnuncioResource
+    public function show(Request $request, string $anuncio): AnuncioResource
     {
-        $model = ctype_digit($anuncio)
-            ? Anuncio::query()->find($anuncio)
-            : Anuncio::query()->where('slug', $anuncio)->first();
-
-        abort_if($model === null, 404);
+        $model = $this->anuncios->porChave($anuncio);
 
         $this->authorize('view', $model);
 
-        $model->load(['categoria', 'distrito', 'concelho', 'galeria', 'user']);
+        $dono = $request->user()
+            && ($request->user()->id === $model->user_id || $request->user()->isAdmin());
+
+        $model->load([
+            'categoria', 'distrito', 'concelho', 'galeria', 'user',
+            'reviews' => function ($q) use ($dono) {
+                $q->with('user')->orderByDesc('id');
+                if (! $dono) {
+                    $q->where('status', 'aprovado');
+                }
+            },
+            'favoritos' => fn ($q) => $q->where('user_id', $request->user()?->id ?? 0),
+        ]);
         $model->increment('views');
 
         return new AnuncioResource($model);

@@ -6,17 +6,14 @@ use App\Http\Requests\StoreAnuncioRequest;
 use App\Http\Requests\UpdateAnuncioRequest;
 use App\Models\Anuncio;
 use App\Models\Categoria;
-use App\Models\Configuracao;
-use App\Models\ContactoEvento;
 use App\Models\Distrito;
 use App\Models\GaleriaAnuncio;
 use App\Models\User;
 use App\Notifications\AccountAutoCreatedNotification;
 use App\Services\AnuncioListagem;
-use App\Services\AnuncioPublicadoNotifier;
-use App\Services\ContactoReveladoNotifier;
-use App\Services\ImageUploadService;
-use App\Services\ModeracaoService;
+use App\Services\GestaoGaleria;
+use App\Services\PublicacaoAnuncio;
+use App\Services\RevelacaoContacto;
 use App\Services\UsernameGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -30,12 +27,11 @@ use Illuminate\View\View;
 class AnuncioController extends Controller
 {
     public function __construct(
-        private readonly ImageUploadService $images,
-        private readonly ModeracaoService $moderacao,
-        private readonly ContactoReveladoNotifier $contactoNotifier,
-        private readonly AnuncioPublicadoNotifier $publicadoNotifier,
         private readonly AnuncioListagem $listagem,
         private readonly UsernameGenerator $usernames,
+        private readonly PublicacaoAnuncio $publicacao,
+        private readonly GestaoGaleria $galeria,
+        private readonly RevelacaoContacto $revelacao,
     ) {}
 
     public function index(Request $request): View
@@ -125,34 +121,8 @@ class AnuncioController extends Controller
             }
         }
 
-        $anuncio = Anuncio::create([
-            ...collect($data)->only([
-                'titulo', 'minha_empresa', 'categoria_id', 'distrito_id',
-                'descricao', 'contacto', 'email', 'youtube_link', 'instagram_link',
-            ])->all(),
-            'user_id' => $user->id,
-            'destacar' => $request->boolean('destacar'),
-            'certificacao_profissional' => $request->boolean('certificacao_profissional'),
-            'seguro_responsabilidade_civil' => $request->boolean('seguro_responsabilidade_civil'),
-            'status' => 'pendente',
-        ]);
-
-        $status = 'pendente';
-
-        if (Configuracao::get('auto_approval_enabled') === '1') {
-            if ($this->moderacao->verificar($data['titulo'], $data['descricao'])) {
-                $anuncio->aprovar();
-                $this->publicadoNotifier->notificar($anuncio);
-                $status = 'aprovado';
-            } else {
-                $anuncio->update(['status' => 'rejeitado']);
-                $status = 'rejeitado';
-            }
-        }
-
-        $user->update(['lembrete_anuncio_status' => 0]);
-
-        $this->images->storeGaleria($anuncio, $request);
+        $anuncio = $this->publicacao->criar($user, $data, $request);
+        $status = $anuncio->status;
 
         $mensagens = [
             'pendente' => 'Anúncio submetido com sucesso! Fica pendente de aprovação.',
@@ -190,19 +160,7 @@ class AnuncioController extends Controller
 
     public function update(UpdateAnuncioRequest $request, Anuncio $anuncio): RedirectResponse
     {
-        $data = $request->validated();
-
-        $anuncio->update([
-            ...collect($data)->only([
-                'titulo', 'minha_empresa', 'categoria_id', 'distrito_id',
-                'descricao', 'contacto', 'email', 'youtube_link', 'instagram_link',
-            ])->all(),
-            'destacar' => $request->boolean('destacar'),
-            'certificacao_profissional' => $request->boolean('certificacao_profissional'),
-            'seguro_responsabilidade_civil' => $request->boolean('seguro_responsabilidade_civil'),
-        ]);
-
-        $this->images->storeGaleria($anuncio, $request);
+        $this->publicacao->atualizar($anuncio, $request->validated(), $request);
 
         return redirect()->route('anuncios.show', $anuncio)->with('status', 'Anúncio atualizado.');
     }
@@ -211,9 +169,7 @@ class AnuncioController extends Controller
     {
         $this->authorize('update', $anuncio);
 
-        abort_unless($anuncio->status === 'expirado', 400);
-
-        $anuncio->aprovar();
+        $this->publicacao->reativar($anuncio);
 
         return back()->with('status', 'Anúncio reativado.');
     }
@@ -222,11 +178,7 @@ class AnuncioController extends Controller
     {
         $this->authorize('delete', $anuncio);
 
-        foreach ($anuncio->galeria as $imagem) {
-            $this->images->delete($imagem->imagem);
-        }
-
-        $anuncio->delete();
+        $this->publicacao->apagar($anuncio);
 
         return redirect()->route('anuncios.meus')->with('status', 'Anúncio removido.');
     }
@@ -246,19 +198,13 @@ class AnuncioController extends Controller
      * "Ver contacto" - this endpoint logs that as a phone_clicks visit
      * (surfaced in admin > Analytics) and returns the number to reveal.
      */
-    public function revelarTelefone(Anuncio $anuncio): JsonResponse
+    public function revelarTelefone(Request $request, Anuncio $anuncio): JsonResponse
     {
         $this->authorize('view', $anuncio);
 
-        $anuncio->increment('phone_clicks');
-        ContactoEvento::registar('telefone', $anuncio);
-
-        // Tell the owner someone saved their contact - after the response is
-        // sent so a slow mail server never delays showing the number.
-        $ip = request()->ip();
-        app()->terminating(fn () => $this->contactoNotifier->notificar($anuncio, $ip));
-
-        return response()->json(['contacto' => $anuncio->contacto]);
+        return response()->json([
+            'contacto' => $this->revelacao->telefone($anuncio, (string) $request->ip()),
+        ]);
     }
 
     /**
@@ -269,21 +215,14 @@ class AnuncioController extends Controller
     {
         $this->authorize('view', $anuncio);
 
-        $url = $anuncio->whatsappUrl();
-        abort_unless($url, 404);
-
-        $anuncio->increment('whatsapp_clicks');
-        ContactoEvento::registar('whatsapp', $anuncio);
-
-        return response()->json(['url' => $url]);
+        return response()->json(['url' => $this->revelacao->whatsapp($anuncio)]);
     }
 
     public function destroyImagem(GaleriaAnuncio $imagem): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $imagem->anuncio);
 
-        $this->images->delete($imagem->imagem);
-        $imagem->delete();
+        $this->galeria->remover($imagem);
 
         if (request()->expectsJson()) {
             return response()->json(['ok' => true]);
@@ -298,20 +237,14 @@ class AnuncioController extends Controller
      */
     public function ordenarImagens(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:'.ImageUploadService::MAX_GALERIA],
-            'ids.*' => ['integer'],
-        ]);
+        $ids = $this->galeria->idsValidados($request);
+        $imagens = GaleriaAnuncio::with('anuncio')->whereIn('id', $ids)->get();
 
-        $imagens = GaleriaAnuncio::with('anuncio')->whereIn('id', $data['ids'])->get()->keyBy('id');
-
-        abort_unless($imagens->count() === count($data['ids']), 422);
+        abort_unless($imagens->count() === count($ids), 422);
         abort_unless($imagens->pluck('anuncio_id')->unique()->count() === 1, 422);
         $this->authorize('update', $imagens->first()->anuncio);
 
-        foreach (array_values($data['ids']) as $posicao => $id) {
-            $imagens[$id]->update(['ordem' => $posicao + 1]);
-        }
+        $this->galeria->ordenar($ids);
 
         return response()->json(['ok' => true]);
     }
@@ -327,7 +260,7 @@ class AnuncioController extends Controller
 
         $request->validate(['sentido' => ['required', 'in:esquerda,direita']]);
 
-        $this->images->rotate($imagem->imagem, $request->input('sentido') === 'direita');
+        $this->galeria->rodar($imagem, $request->input('sentido') === 'direita');
 
         return response()->json(['url' => Storage::url($imagem->imagem).'?v='.time()]);
     }
