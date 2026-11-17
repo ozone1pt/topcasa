@@ -15,8 +15,11 @@ class PedidoRecrutamento extends Model
 
     protected $fillable = [
         'user_id', 'titulo', 'empresa_nome', 'email', 'telefone', 'distrito_id',
-        'descricao', 'foto', 'termo_aceite', 'status', 'notas_admin',
+        'descricao', 'foto', 'termo_aceite', 'status', 'notas_admin', 'motivo_rejeicao',
     ];
+
+    /** Novas vagas ficam pendentes até serem aprovadas no CRM (como os anúncios). */
+    public const ESTADOS_APROVADOS = ['ativo', 'pausado', 'cancelado'];
 
     protected function casts(): array
     {
@@ -36,5 +39,16 @@ class PedidoRecrutamento extends Model
     public function scopeAtivos($query)
     {
         return $query->where('status', 'ativo');
+    }
+
+    /** Já passou pela aprovação no CRM (ativo, ou depois pausado/cancelado). */
+    public function isAprovado(): bool
+    {
+        return in_array($this->status, self::ESTADOS_APROVADOS, true);
+    }
+
+    public function fotoUrl(): ?string
+    {
+        return $this->foto ? \Illuminate\Support\Facades\Storage::url($this->foto) : null;
     }
 }
