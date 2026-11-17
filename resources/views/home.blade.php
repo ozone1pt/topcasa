@@ -4,7 +4,7 @@
         <div class="w-full relative">
             <x-image-carousel
                 :images="[
-                    ['src' => asset('images/banners-home/rollup-1.jpg').'?v=7', 'alt' => 'Mais clientes para o seu negócio, sem intermediários e contactos ilimitados'],
+                    ['src' => asset('images/banners-home/rollup-1-publique-gratis.jpg').'?v=1', 'alt' => 'TopCasa - Mais clientes para o seu negócio. Publique grátis!'],
                     ['src' => asset('images/banners-home/rollup-2.jpg').'?v=8', 'alt' => 'Encontre o profissional certo para a sua casa. Compare opções e contacte diretamente.'],
                 ]"
                 aspect-class="aspect-[1280/720]"
